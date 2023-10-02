@@ -36,7 +36,7 @@ Follow these steps to get your potion shop up and running:
 2. Register on [Render](https://render.com/). Click New + and select Web Service. We will do a basic Build and deploy from a Git repository. Connect it to your Github repository and point it the new repository you created on step 1.
 3. Name your service something cute and unique. Oregon is fine as a region. Leave branch and Root Directory as default. The Runtime should be Python 3. Build command should be pip install -r requirements.txt. Start command should be changed to uvicorn src.api.server:app --host 0.0.0.0 --port $PORT. Select the Free Instance Type. Seelct Advanced and add two environment variables to start. The first is called `API_KEY`. Assign a unique string value to this variable. This string acts as a unique identifier for your shop and helps secure your communications. You will use it later when testing your service and registering it. The second is called `PYTHON_VERSION`. We will set this to 3.11.4.
 5. Visit your newly deployed project to ensure it's functioning as expected. Try navigating to https://`your-project`.onrender.com/docs. Once there, click the 'Authorize' button in the upper right corner and enter the same `API_KEY` you entered into environment variables earlier. After authorization, try out various endpoints to confirm their functionality.
-6. Navigate to [Consortium of Concotions and Charms](https://potion-exchange.vercel.app/), sign in using your GitHub account, and add your newly created shop to the platform. Be sure to provide the URL of your newly deployed Vercel site and the `API_KEY` you set earlier.
+6. Navigate to [Consortium of Concotions and Charms](https://potion-exchange.vercel.app/), sign in using your GitHub account, and add your newly created shop to the platform. Be sure to provide the URL of your newly deployed webservice (don't include doc/, just the base url) and the `API_KEY` you set earlier.
 7. Return to [Consortium of Concotions and Charms](https://potion-exchange.vercel.app/) to monitor the next tick. Check for changes in your gold balance, potion inventory, and other assets. You should see with even this purely static implementation of your API barrels being purchased, potions getting mixed, and selling some potions to customers.
 
 ## Version 1 - Adding persistance
@@ -46,7 +46,7 @@ The first version of your improved store will simply keep track of how many red 
 1. Create an account on [Supabase](https://supabase.com/).
 2. We will start with the simplest possible schema: a single row in a single table. Create a new project in Supabase, select the 'Table Editor' on the left-hand navigation menu, and then click the "Create a new table" button. Create a table called `global_inventory`. This table should have columns named `num_red_potions` (int4), `num_red_ml` (int4), and `gold` (int4) to keep track of your current resources.
 3. Insert an initial row in your database and set `num_red_potions` to 0, `num_red_ml` to 0, and `gold` to 100.
-3. Add your database connection details to the environment variables in your Vercel project. Within your Supabase project settings, go to Database -> Connection String -> URI, copy the connection string, and replace `PASSWORD` with your database password. Back in Vercel, add this modified string as a new environment variable named `POSTGRES_URI`.
+3. Add your database connection details to the environment variables in your Render project. Within your Supabase project settings, go to Database -> Connection String -> URI, copy the connection string, and replace `PASSWORD` with your database password. Back in Vercel, add this modified string as a new environment variable named `POSTGRES_URI`.
 
 In your backend repository, establish a connection to your Supabase database using SQLAlchemy, drawing the `POSTGRES_URI` from environment variables. To do so, create a database.py file in your src folder with the following code:
 ```py
@@ -73,7 +73,7 @@ from src import database as db
 And execute SQL in each of your endpoints (barrels.py, bottler.py, carts.py, and catalog.py) as:
 ```py
 with db.engine.begin() as connection:
-        result = connection.execute(sql_to_execute)
+        result = connection.execute(sqlalchemy.text(sql_to_execute))
 ```
 
 You will need to use SELECT and UPDATE sql statements. In this version you won't need to do any INSERTs or DELETEs.
@@ -83,4 +83,9 @@ As a very basic initial logic, purchase a new small red potion barrel only if th
 Once you've finished making your changes, go back to [Consortium of Concotions and Charms](https://potion-exchange.vercel.app/) and click "Burn Shop to Ground!" at the bottom of the page to reset your shop's state back to the beginning.
 
 With the release of this version, you should no longer encounter job errors resulting from attempting to buy barrels without sufficient gold, mix potions without the necessary ml of ingredients, or sell potions not currently in your inventory.
+
+## Version 2 - Selling more than red potions
+
+In this second version of your shop, you need to also make and sell blue and green potions. You will need to come up with your own logic for when to buy red, green, or blue barrels. Your logic does not have to be particularly clever, you just have to make sure at some point your shop is successfully selling red, green, and blue potions. The implementation details from there are completely up to you.
+
 
