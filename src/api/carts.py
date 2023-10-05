@@ -81,7 +81,7 @@ def checkout(cart_id: int, cart_checkout: CartCheckout):
     get_cart_sql = sqlalchemy.text("select * from global_carts where cart_id = {}".format(cart_id))
     print("get_cart_sql:", get_cart_sql)
     reset_cart_sql = sqlalchemy.text(
-        "update global_carts set num_red_potions = 0, total_price = 0 where cart_id = {0}".format(cart_id))
+        "delete from global_carts where cart_id = {}".format(cart_id))
     print("reset_cart_sql:", reset_cart_sql)
     with db.engine.begin() as connection:
         result = connection.execute(get_cart_sql).one()
