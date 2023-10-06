@@ -14,18 +14,43 @@ router = APIRouter(
     dependencies=[Depends(auth.get_api_key)],
 )
 
+
 class Column(Enum):
     POTIONS = 0
-    ML_IN_BARREL= 1
-    GOLD = 2
+    ML = 1
+
 
 @router.get("/inventory")
 def get_inventory():
     """ """
+    get_gold_sql = sqlalchemy.text("select gold from global_inventory")
+    get_num_red_sql = sqlalchemy.text("select num_red_potions, num_red_ml from global_inventory")
+    get_num_green_sql = sqlalchemy.text("select num_green_potions, num_green_ml from global_inventory")
+    get_num_blue_sql = sqlalchemy.text("select num_blue_potions, num_blue_ml from global_inventory")
     with db.engine.begin() as connection:
-        sql_to_execute = sqlalchemy.text("select * from global_inventory")
-        result = connection.execute(sql_to_execute).one()
-        payload = {"number_of_potions": result[Column.POTIONS.value], "ml_in_barrels": result[Column.ML_IN_BARREL.value], "gold": result[Column.GOLD.value]}
+        num_gold = connection.execute(get_gold_sql).one()[0]
+        red = connection.execute(get_num_red_sql).one()
+        print("red tuple:", red)
+        num_red_potions, num_red_ml = red[Column.POTIONS.value], red[Column.ML.value]
+        print("num_red_potions:", num_red_potions)
+        print("num_red_ml:", num_red_ml)
+
+        green = connection.execute(get_num_green_sql).one()
+        print("green tuple:", green)
+        num_green_potions, num_green_ml = green[Column.POTIONS.value], green[Column.ML.value]
+        print("num_green_potions:", num_green_potions)
+        print("num_green_ml:", num_green_ml)
+
+        blue = connection.execute(get_num_blue_sql).one()
+        print("blue tuple:", blue)
+        num_blue_potions, num_blue_ml = blue[Column.POTIONS.value], blue[Column.ML.value]
+        print("num_blue_potions:", num_blue_potions)
+        print("num_blue_ml:", num_blue_ml)
+
+    payload = {"number_of_red_potions": num_red_potions, "red_ml_in_barrels": num_red_ml,
+               "number_of_green_potions": num_green_potions, "green_ml_in_barrels": num_green_ml,
+               "number_of_blue_potions": num_blue_potions, "blue_ml_in_barrels": num_blue_ml,
+               "gold": num_gold}
     return payload
 
 
