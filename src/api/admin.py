@@ -17,7 +17,11 @@ def reset():
     inventory, and all barrels are removed from inventory. Carts are all reset.
     """
     clear_inventory_sql = sqlalchemy.text(
-        "update global_inventory set num_red_ml = 0, num_red_potions = 0 , gold = 100")
+        "update global_inventory set num_red_ml = 0, num_red_potions = 0, \
+        num_green_ml = 0, num_green_potions = 0, \
+        num_blue_ml = 0, num_blue_potions = 0, \
+        gold = 100"
+    )
     print("clear_inventory_sql: ", clear_inventory_sql)
     clear_carts_sql = sqlalchemy.text("delete from global_carts")
     print("clear_carts_sql: ", clear_carts_sql)
