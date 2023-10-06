@@ -87,9 +87,9 @@ def post_deliver_barrels(barrels_delivered: list[Barrel]):
     return "OK"
 
 
-def get_best_barrel_sku_and_price(barrels: dict[str, Barrel], gold_remaining: int) -> Barrel:
+def get_best_barrel_sku_and_price(barrels: dict[str, Barrel], gold_remaining: int) -> Barrel | None:
     if not barrels:
-        return None, None
+        return None
     highest_value_barrel = min(barrels.values(), key=lambda barrel: barrel.price)
     print("highest_value_barrel:", highest_value_barrel)
     if highest_value_barrel.price <= gold_remaining and highest_value_barrel.quantity > 0:
