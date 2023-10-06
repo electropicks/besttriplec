@@ -30,19 +30,16 @@ def get_inventory():
     with db.engine.begin() as connection:
         num_gold = connection.execute(get_gold_sql).one()[0]
         red = connection.execute(get_num_red_sql).one()
-        print("red tuple:", red)
         num_red_potions, num_red_ml = red[Column.POTIONS.value], red[Column.ML.value]
         print("num_red_potions:", num_red_potions)
         print("num_red_ml:", num_red_ml)
 
         green = connection.execute(get_num_green_sql).one()
-        print("green tuple:", green)
         num_green_potions, num_green_ml = green[Column.POTIONS.value], green[Column.ML.value]
         print("num_green_potions:", num_green_potions)
         print("num_green_ml:", num_green_ml)
 
         blue = connection.execute(get_num_blue_sql).one()
-        print("blue tuple:", blue)
         num_blue_potions, num_blue_ml = blue[Column.POTIONS.value], blue[Column.ML.value]
         print("num_blue_potions:", num_blue_potions)
         print("num_blue_ml:", num_blue_ml)
