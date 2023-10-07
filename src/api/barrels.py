@@ -189,7 +189,8 @@ def get_wholesale_purchase_plan(wholesale_catalog: list[Barrel]):
             break
 
     print("to_buy:", to_buy)
-    list_to_buy = list(to_buy.items())
+    # convert default dict into list of objects of format {"sku": string, "quantity": int}
+    list_to_buy = [{"sku": sku, "quantity": quantity} for sku, quantity in to_buy.items()]
 
     print("list_to_buy:", list_to_buy)
     print("gold remaining after purchase is made:", gold_remaining)
