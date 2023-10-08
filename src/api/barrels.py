@@ -121,7 +121,8 @@ def get_wholesale_purchase_plan(wholesale_catalog: list[Barrel]):
     gold_remaining = inventory["gold"]
     print("gold_remaining:", gold_remaining)
 
-    red_score = Option(RED, inventory["number_of_red_potions"] * 100 + inventory["red_ml_in_barrels"])
+    # red_score = Option(RED, inventory["number_of_red_potions"] * 100 + inventory["red_ml_in_barrels"])
+    red_score = Option(RED, 100000)
     green_score = Option(GREEN, inventory["number_of_green_potions"] * 100 + inventory["green_ml_in_barrels"])
     blue_score = Option(BLUE, inventory["number_of_blue_potions"] * 100 + inventory["blue_ml_in_barrels"])
     print("red_score:", red_score)
