@@ -1,11 +1,11 @@
 import math
-from random import randint
 from collections import defaultdict
+from dataclasses import dataclass
+from random import randint
 
 import sqlalchemy
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel
-from dataclasses import dataclass
 
 from src import database as db
 from src.api import auth
@@ -49,40 +49,50 @@ def post_deliver_barrels(barrels_delivered: list[Barrel]):
     """ """
     print("barrels_delivered", barrels_delivered)
 
-    red_barrels_delivered = list(filter(lambda barrel: barrel.potion_type == [1, 0, 0, 0], barrels_delivered))
-    print("red_barrels_delivered:", red_barrels_delivered)
-    if red_barrels_delivered:
-        for red_barrel in red_barrels_delivered:
-            buy_red_barrel_sql = sqlalchemy.text(
-                "update global_inventory set num_red_ml = num_red_ml + {0} * {1}, gold = gold - {2} * {1}".format(
-                    red_barrel.ml_per_barrel, red_barrel.quantity, red_barrel.price))
-            print("buy_red_barrel_sql:", buy_red_barrel_sql)
-            with db.engine.begin() as connection:
-                connection.execute(buy_red_barrel_sql)
+    with db.engine.begin() as connection:
+        for barrel in barrels_delivered:
+            if barrel.potion_type == [1, 0, 0, 0]:
+                buy_red_barrel_sql = sqlalchemy.text(
+                    "update global_inventory set \
+                    red_ml = red_ml + :ml_per_barrel * :quantity, \
+                    checking_gold = checking_gold - :price * :quantity"
+                )
+                params = {
+                    "ml_per_barrel": barrel.ml_per_barrel,
+                    "quantity": barrel.quantity,
+                    "price": barrel.price
+                }
+                print("buy_red_barrel_sql:", buy_red_barrel_sql)
+                connection.execute(buy_red_barrel_sql, params)
                 print("Executed buy_red_barrel_sql")
 
-    green_barrels_delivered = list(filter(lambda barrel: barrel.potion_type == [0, 1, 0, 0], barrels_delivered))
-    print("green_barrels_delivered:", green_barrels_delivered)
-    if green_barrels_delivered:
-        for green_barrel in green_barrels_delivered:
-            buy_green_barrel_sql = sqlalchemy.text(
-                "update global_inventory set num_green_ml = num_green_ml + {0} * {1}, gold = gold - {2} * {1}".format(
-                    green_barrel.ml_per_barrel, green_barrel.quantity, green_barrel.price))
-            print("buy_green_barrel_sql:", buy_green_barrel_sql)
-            with db.engine.begin() as connection:
-                connection.execute(buy_green_barrel_sql)
+            elif barrel.potion_type == [0, 1, 0, 0]:
+                buy_green_barrel_sql = sqlalchemy.text(
+                    "update global_inventory set green_ml = green_ml + :ml_per_barrel * :quantity, \
+                    checking_gold = checking_gold - :price * :quantity"
+                )
+                params = {
+                    "ml_per_barrel": barrel.ml_per_barrel,
+                    "quantity": barrel.quantity,
+                    "price": barrel.price
+                }
+                print("buy_green_barrel_sql:", buy_green_barrel_sql)
+                connection.execute(buy_green_barrel_sql, params)
                 print("Executed buy_green_barrel_sql")
 
-    blue_barrels_delivered = list(filter(lambda barrel: barrel.potion_type == [0, 0, 1, 0], barrels_delivered))
-    print("blue_barrels_delivered:", blue_barrels_delivered)
-    if blue_barrels_delivered:
-        for blue_barrel in blue_barrels_delivered:
-            buy_blue_barrel_sql = sqlalchemy.text(
-                "update global_inventory set num_blue_ml = num_blue_ml + {0} * {1}, gold = gold - {2} * {1}".format(
-                    blue_barrel.ml_per_barrel, blue_barrel.quantity, blue_barrel.price))
-            print("buy_blue_barrel_sql:", buy_blue_barrel_sql)
-            with db.engine.begin() as connection:
-                connection.execute(buy_blue_barrel_sql)
+            elif barrel.potion_type == [0, 0, 1, 0]:
+                buy_blue_barrel_sql = sqlalchemy.text(
+                    "update global_inventory set \
+                    blue_ml = blue_ml + :ml_per_barrel * :quantity, \
+                    checking_gold = checking_gold - :price * :quantity"
+                )
+                params = {
+                    "ml_per_barrel": barrel.ml_per_barrel,
+                    "quantity": barrel.quantity,
+                    "price": barrel.price
+                }
+                print("buy_blue_barrel_sql:", buy_blue_barrel_sql)
+                connection.execute(buy_blue_barrel_sql, params)
                 print("Executed buy_blue_barrel_sql")
 
     return "OK"
