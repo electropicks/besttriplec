@@ -23,26 +23,29 @@ class Column(Enum):
 @router.get("/inventory")
 def get_inventory():
     """ """
-    get_gold_sql = sqlalchemy.text("select gold from global_inventory")
-    get_num_red_sql = sqlalchemy.text("select num_red_potions, num_red_ml from global_inventory")
-    get_num_green_sql = sqlalchemy.text("select num_green_potions, num_green_ml from global_inventory")
-    get_num_blue_sql = sqlalchemy.text("select num_blue_potions, num_blue_ml from global_inventory")
+    get_gold_sql = sqlalchemy.text("select checking_gold from global_inventory")
+    get_num_red_potions_sql = sqlalchemy.text("select * from global_catalog where num_red_ml = 100")
+    get_num_green_potions_sql = sqlalchemy.text("select * from global_catalog where num_green_ml = 100")
+    get_num_blue_potions_sql = sqlalchemy.text("select * from global_catalog where num_blue_ml = 100")
+    get_num_red_ml_sql = sqlalchemy.text("select red_ml from global_inventory")
+    get_num_green_ml_sql = sqlalchemy.text("select green_ml from global_inventory")
+    get_num_blue_ml_sql = sqlalchemy.text("select blue_ml from global_inventory")
     with db.engine.begin() as connection:
-        num_gold = connection.execute(get_gold_sql).one()[0]
-        red = connection.execute(get_num_red_sql).one()
-        num_red_potions, num_red_ml = red[Column.POTIONS.value], red[Column.ML.value]
+        num_red_potions = len(connection.execute(get_num_red_potions_sql).fetchall())
         print("num_red_potions:", num_red_potions)
-        print("num_red_ml:", num_red_ml)
-
-        green = connection.execute(get_num_green_sql).one()
-        num_green_potions, num_green_ml = green[Column.POTIONS.value], green[Column.ML.value]
+        num_green_potions = len(connection.execute(get_num_green_potions_sql).fetchall())
         print("num_green_potions:", num_green_potions)
-        print("num_green_ml:", num_green_ml)
-
-        blue = connection.execute(get_num_blue_sql).one()
-        num_blue_potions, num_blue_ml = blue[Column.POTIONS.value], blue[Column.ML.value]
+        num_blue_potions = len(connection.execute(get_num_blue_potions_sql).fetchall())
         print("num_blue_potions:", num_blue_potions)
+
+        num_red_ml = connection.execute(get_num_red_ml_sql).one()[0]
+        print("num_red_ml:", num_red_ml)
+        num_green_ml = connection.execute(get_num_green_ml_sql).one()[0]
+        print("num_green_ml:", num_green_ml)
+        num_blue_ml = connection.execute(get_num_blue_ml_sql).one()[0]
         print("num_blue_ml:", num_blue_ml)
+        num_gold = connection.execute(get_gold_sql).one()[0]
+        print("num_gold:", num_gold)
 
     payload = {"number_of_red_potions": num_red_potions, "red_ml_in_barrels": num_red_ml,
                "number_of_green_potions": num_green_potions, "green_ml_in_barrels": num_green_ml,

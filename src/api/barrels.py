@@ -1,4 +1,5 @@
 import math
+from random import randint
 from collections import defaultdict
 
 import sqlalchemy
@@ -122,9 +123,12 @@ def get_wholesale_purchase_plan(wholesale_catalog: list[Barrel]):
     print("gold_remaining:", gold_remaining)
 
     # red_score = Option(RED, inventory["number_of_red_potions"] * 100 + inventory["red_ml_in_barrels"])
-    red_score = Option(RED, 100000)
-    green_score = Option(GREEN, inventory["number_of_green_potions"] * 100 + inventory["green_ml_in_barrels"])
-    blue_score = Option(BLUE, inventory["number_of_blue_potions"] * 100 + inventory["blue_ml_in_barrels"])
+    # red_score = Option(RED, 100000)
+    # green_score = Option(GREEN, inventory["number_of_green_potions"] * 100 + inventory["green_ml_in_barrels"])
+    # blue_score = Option(BLUE, inventory["number_of_blue_potions"] * 100 + inventory["blue_ml_in_barrels"])
+    red_score = Option(RED, randint(0, 100))
+    green_score = Option(GREEN, randint(0, 100))
+    blue_score = Option(BLUE, randint(0, 100))
     print("red_score:", red_score)
     print("green_score:", green_score)
     print("blue_score:", blue_score)
