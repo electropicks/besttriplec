@@ -94,6 +94,20 @@ def post_deliver_barrels(barrels_delivered: list[Barrel]):
                 print("buy_blue_barrel_sql:", buy_blue_barrel_sql)
                 connection.execute(buy_blue_barrel_sql, params)
                 print("Executed buy_blue_barrel_sql")
+            elif barrel.potion_type == [0, 0, 0, 1]:
+                buy_dark_barrel_sql = sqlalchemy.text(
+                    "update global_inventory set \
+                    dark_ml = dark_ml + :ml_per_barrel * :quantity, \
+                    checking_gold = checking_gold - :price * :quantity"
+                )
+                params = {
+                    "ml_per_barrel": barrel.ml_per_barrel,
+                    "quantity": barrel.quantity,
+                    "price": barrel.price
+                }
+                print("buy_dark_barrel_sql:", buy_dark_barrel_sql)
+                connection.execute(buy_dark_barrel_sql, params)
+                print("Executed buy_dark_barrel_sql")
 
     return "OK"
 

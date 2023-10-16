@@ -104,10 +104,18 @@ def get_bottle_plan():
 
     if inventory["red_ml_in_barrels"] >= 50 and inventory["blue_ml_in_barrels"] >= 50:
         potions_to_brew.append({"potion_type": [50, 0, 50, 0], "quantity": 1})
-    if inventory["red_ml_in_barrels"] >= 50 and inventory["green_ml_in_barrels"] >= 50:
+    elif inventory["red_ml_in_barrels"] >= 50 and inventory["green_ml_in_barrels"] >= 50:
         potions_to_brew.append({"potion_type": [50, 50, 0, 0], "quantity": 1})
-    if inventory["blue_ml_in_barrels"] >= 50 and inventory["green_ml_in_barrels"] >= 50:
+    elif inventory["blue_ml_in_barrels"] >= 50 and inventory["green_ml_in_barrels"] >= 50:
         potions_to_brew.append({"potion_type": [0, 50, 50, 0], "quantity": 1})
+    elif inventory["red_ml_in_barrels"] >= 100:
+        potions_to_brew.append({"potion_type": [100, 0, 0, 0], "quantity": 1})
+    elif inventory["green_ml_in_barrels"] >= 100:
+        potions_to_brew.append({"potion_type": [0, 100, 0, 0], "quantity": 1})
+    elif inventory["blue_ml_in_barrels"] >= 100:
+        potions_to_brew.append({"potion_type": [0, 0, 100, 0], "quantity": 1})
+    elif inventory["dark_ml_in_barrels"] >= 100:
+        potions_to_brew.append({"potion_type": [0, 0, 0, 100], "quantity": 1})
 
     print("potions to brew:", potions_to_brew)
     return potions_to_brew
