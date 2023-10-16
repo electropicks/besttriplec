@@ -24,9 +24,9 @@ class Column(Enum):
 def get_inventory():
     """ """
     get_gold_sql = sqlalchemy.text("select checking_gold from global_inventory")
-    get_num_red_potions_sql = sqlalchemy.text("select * from global_catalog where num_red_ml = 100")
-    get_num_green_potions_sql = sqlalchemy.text("select * from global_catalog where num_green_ml = 100")
-    get_num_blue_potions_sql = sqlalchemy.text("select * from global_catalog where num_blue_ml = 100")
+    get_num_red_potions_sql = sqlalchemy.text("select * from global_catalog where red_ml = 100")
+    get_num_green_potions_sql = sqlalchemy.text("select * from global_catalog where green_ml = 100")
+    get_num_blue_potions_sql = sqlalchemy.text("select * from global_catalog where blue_ml = 100")
     get_num_red_ml_sql = sqlalchemy.text("select red_ml from global_inventory")
     get_num_green_ml_sql = sqlalchemy.text("select green_ml from global_inventory")
     get_num_blue_ml_sql = sqlalchemy.text("select blue_ml from global_inventory")
