@@ -122,17 +122,11 @@ def get_bottle_plan():
                        inventory["green_ml_in_barrels"] * green_percentage // 100,
                        inventory["dark_ml_in_barrels"] * dark_percentage // 100)
 
-        # If we have a valid potion, add it to the brew list and update the inventory.
+        # If we have a valid potion, add it to the brew list
         if quantity > 0:
             potion_to_add = {"potion_type": [red_percentage, blue_percentage, green_percentage, dark_percentage],
                              "quantity": quantity}
             potions_to_brew.append(potion_to_add)
-
-            # Update inventory.
-            inventory["red_ml_in_barrels"] -= quantity * red_percentage // 100
-            inventory["blue_ml_in_barrels"] -= quantity * blue_percentage // 100
-            inventory["green_ml_in_barrels"] -= quantity * green_percentage // 100
-            inventory["dark_ml_in_barrels"] -= quantity * dark_percentage // 100
 
             # Recalculate the total inventory.
             total_inventory = sum(inventory.values())
