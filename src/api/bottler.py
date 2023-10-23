@@ -1,5 +1,7 @@
+import random
+
 import sqlalchemy
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
 from src import database as db
@@ -98,24 +100,50 @@ def get_bottle_plan():
     # Expressed in integers from 1 to 100 that must sum up to 100.
 
     inventory = get_inventory()
-    print("inventory:", inventory)
+    print("Current inventory:", inventory)
+
+    # Calculate the total inventory.
+    total_inventory = sum(inventory.values())
 
     potions_to_brew = []
 
-    if inventory["red_ml_in_barrels"] >= 50 and inventory["blue_ml_in_barrels"] >= 50:
-        potions_to_brew.append({"potion_type": [50, 0, 50, 0], "quantity": 1})
-    elif inventory["red_ml_in_barrels"] >= 50 and inventory["green_ml_in_barrels"] >= 50:
-        potions_to_brew.append({"potion_type": [50, 50, 0, 0], "quantity": 1})
-    elif inventory["blue_ml_in_barrels"] >= 50 and inventory["green_ml_in_barrels"] >= 50:
-        potions_to_brew.append({"potion_type": [0, 50, 50, 0], "quantity": 1})
-    elif inventory["red_ml_in_barrels"] >= 100:
-        potions_to_brew.append({"potion_type": [100, 0, 0, 0], "quantity": 1})
-    elif inventory["green_ml_in_barrels"] >= 100:
-        potions_to_brew.append({"potion_type": [0, 100, 0, 0], "quantity": 1})
-    elif inventory["blue_ml_in_barrels"] >= 100:
-        potions_to_brew.append({"potion_type": [0, 0, 100, 0], "quantity": 1})
-    elif inventory["dark_ml_in_barrels"] >= 100:
-        potions_to_brew.append({"potion_type": [0, 0, 0, 100], "quantity": 1})
+    # Continue bottling as long as there's sufficient inventory.
+    while total_inventory >= 100:
+        # Create a potion mix by selecting a random percentage of each type.
+        red_percentage = random.randint(0, min(100, inventory["red_ml_in_barrels"]))
+        blue_percentage = random.randint(0, min(100 - red_percentage, inventory["blue_ml_in_barrels"]))
+        green_percentage = random.randint(0,
+                                          min(100 - red_percentage - blue_percentage, inventory["green_ml_in_barrels"]))
+        dark_percentage = 100 - red_percentage - blue_percentage - green_percentage  # Remaining percent.
 
-    print("potions to brew:", potions_to_brew)
+        # Determine the quantity for this batch based on the smallest amount necessary according to percentages.
+        quantity = min(inventory["red_ml_in_barrels"] * red_percentage // 100,
+                       inventory["blue_ml_in_barrels"] * blue_percentage // 100,
+                       inventory["green_ml_in_barrels"] * green_percentage // 100,
+                       inventory["dark_ml_in_barrels"] * dark_percentage // 100)
+
+        # If we have a valid potion, add it to the brew list and update the inventory.
+        if quantity > 0:
+            potion_to_add = {"potion_type": [red_percentage, blue_percentage, green_percentage, dark_percentage],
+                             "quantity": quantity}
+            potions_to_brew.append(potion_to_add)
+
+            # Update inventory.
+            inventory["red_ml_in_barrels"] -= quantity * red_percentage // 100
+            inventory["blue_ml_in_barrels"] -= quantity * blue_percentage // 100
+            inventory["green_ml_in_barrels"] -= quantity * green_percentage // 100
+            inventory["dark_ml_in_barrels"] -= quantity * dark_percentage // 100
+
+            # Recalculate the total inventory.
+            total_inventory = sum(inventory.values())
+        else:
+            break  # No potions can be made, exit the loop.
+
+    # Check if the total inventory is less than 100ml, and if not, raise an exception.
+    if total_inventory >= 100:
+        raise HTTPException(status_code=400, detail="The total inventory could not be reduced below 100ml.")
+
+    print("Final potions to brew:", potions_to_brew)
+    print("Updated inventory:", inventory)
+
     return potions_to_brew
