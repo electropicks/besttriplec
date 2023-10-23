@@ -114,7 +114,8 @@ def get_bottle_plan():
         blue_percentage = random.randint(0, min(100 - red_percentage, inventory["blue_ml_in_barrels"]))
         green_percentage = random.randint(0,
                                           min(100 - red_percentage - blue_percentage, inventory["green_ml_in_barrels"]))
-        dark_percentage = 100 - red_percentage - blue_percentage - green_percentage  # Remaining percent.
+        dark_percentage = random.randint(0, min(100 - red_percentage - blue_percentage - green_percentage,
+                                                inventory["dark_ml_in_barrels"]))
 
         # Determine the quantity for this batch based on the smallest amount necessary according to percentages.
         quantity = min(inventory["red_ml_in_barrels"] * red_percentage // 100,
