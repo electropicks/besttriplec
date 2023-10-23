@@ -1,12 +1,11 @@
 import random
-
-import sqlalchemy
+from sqlalchemy import insert, select, update
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
-
 from src import database as db
 from src.api import auth
 from src.api.audit import get_inventory
+from src.database import global_catalog, global_inventory
 
 router = APIRouter(
     prefix="/bottler",
@@ -15,6 +14,7 @@ router = APIRouter(
 )
 
 
+# Assuming that your database's metadata is defined in your actual application
 class PotionInventory(BaseModel):
     potion_type: list[int]
     quantity: int
@@ -22,69 +22,60 @@ class PotionInventory(BaseModel):
 
 @router.post("/deliver")
 def post_deliver_bottles(potions_delivered: list[PotionInventory]):
-    """ """
+    """Receive deliveries of new potions and update the inventory."""
     print("potions delivered:", potions_delivered)
     for potion in potions_delivered:
         red_ml = potion.potion_type[0]
         green_ml = potion.potion_type[1]
         blue_ml = potion.potion_type[2]
         dark_ml = potion.potion_type[3]
-        sku = ""
-        if red_ml > 0:
-            sku += "RED_"
-        if green_ml > 0:
-            sku += "GREEN_"
-        if blue_ml > 0:
-            sku += "BLUE_"
-        if dark_ml > 0:
-            sku += "DARK_"
-        sku += "POTION"
+
+        sku = f"r{red_ml}g{green_ml}b{blue_ml}d{dark_ml}"
+
         quantity = potion.quantity
         print("Current potion, sku, quantity:", potion, sku, quantity)
 
-        # Update the inventory
-        update_inventory_sql = sqlalchemy.text(
-            "update global_inventory set red_ml = red_ml - :red_ml, \
-            green_ml = green_ml - :green_ml, \
-            blue_ml = blue_ml - :blue_ml, \
-            dark_ml = dark_ml - :dark_ml"
-        )
-        print("update_inventory_sql:", update_inventory_sql)
-
-        # Check if there are already potions of this type in the catalog
-        get_potion_existence_sql = sqlalchemy.text("select * from global_catalog where sku = :sku")
-        print("get_potion_sql:", get_potion_existence_sql)
-
         with db.engine.begin() as connection:
-            result = connection.execute(get_potion_existence_sql, {"sku": sku}).fetchall()
+            # Check if the potion already exists in the catalog
+            get_potion_stmt = select([global_catalog]).where(global_catalog.c.sku == sku)
+            result = connection.execute(get_potion_stmt).fetchall()
             print("Executed get_potion_sql")
+
             if len(result) == 0:
-                # Add the potion to the catalog
-                add_potion_sql = sqlalchemy.text(
-                    "insert into global_catalog (sku, red_ml, green_ml, blue_ml, dark_ml, quantity) \
-                    values (:sku, :red_ml, :green_ml, :blue_ml, :dark_ml, :quantity)"
+                # Potion doesn't exist, insert a new record
+                add_potion_stmt = insert(global_catalog).values(
+                    sku=sku,
+                    red_ml=red_ml,
+                    green_ml=green_ml,
+                    blue_ml=blue_ml,
+                    dark_ml=dark_ml,
+                    quantity=quantity
                 )
-                print("add_potion_sql:", add_potion_sql)
-                connection.execute(
-                    add_potion_sql,
-                    {"sku": sku, "red_ml": red_ml, "green_ml": green_ml, "blue_ml": blue_ml, "dark_ml": dark_ml,
-                     "quantity": quantity},
-                )
+                connection.execute(add_potion_stmt)
                 print("Executed add_potion_sql")
             else:
-                # Update the quantity of the potion in the catalog
-                update_potion_sql = sqlalchemy.text(
-                    "update global_catalog set quantity = quantity + :quantity \
-                    where sku = :sku"
+                # Potion exists, update the quantity
+                update_potion_stmt = (
+                    update(global_catalog)
+                    .where(global_catalog.c.sku == sku)
+                    .values(quantity=global_catalog.c.quantity + quantity)
                 )
-                print("update_potion_sql:", update_potion_sql)
-                connection.execute(update_potion_sql, {"sku": sku, "quantity": quantity})
+                connection.execute(update_potion_stmt)
                 print("Executed update_potion_sql")
-            connection.execute(
-                update_inventory_sql,
-                {"red_ml": red_ml, "green_ml": green_ml, "blue_ml": blue_ml, "dark_ml": dark_ml},
+
+            # Update the inventory
+            update_inventory_stmt = (
+                update(global_inventory)
+                .values(
+                    red_ml=global_inventory.c.red_ml - red_ml,
+                    green_ml=global_inventory.c.green_ml - green_ml,
+                    blue_ml=global_inventory.c.blue_ml - blue_ml,
+                    dark_ml=global_inventory.c.dark_ml - dark_ml
+                )
             )
+            connection.execute(update_inventory_stmt)
             print("Executed update_inventory_sql")
+
     return "OK"
 
 
