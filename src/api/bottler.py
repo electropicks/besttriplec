@@ -83,53 +83,69 @@ def post_deliver_bottles(potions_delivered: list[PotionInventory]):
 @router.post("/plan")
 def get_bottle_plan():
     """
-    Go from barrel to bottle.
+    Create a potion mix with random components ensuring the total is always 100ml.
     """
-
-    # Each bottle has a quantity of what proportion of red, blue, and
-    # green potion to add.
-    # Expressed in integers from 1 to 100 that must sum up to 100.
-
-    inventory = get_inventory()
-    print("Current inventory:", inventory)
-
-    # Calculate the total inventory.
-    total_inventory = sum(inventory.values())
+    inventory = get_inventory()  # This function should retrieve the current inventory status
+    print("Starting with inventory:", inventory)
 
     potions_to_brew = []
+    potion_components = ['red_ml_in_barrels', 'blue_ml_in_barrels', 'green_ml_in_barrels', 'dark_ml_in_barrels']
 
-    # Continue bottling as long as there's sufficient inventory.
-    while total_inventory >= 100:
-        # Create a potion mix by selecting a random percentage of each type.
-        red_percentage = random.randint(0, min(100, inventory["red_ml_in_barrels"]))
-        blue_percentage = random.randint(0, min(100 - red_percentage, inventory["blue_ml_in_barrels"]))
-        green_percentage = random.randint(0,
-                                          min(100 - red_percentage - blue_percentage, inventory["green_ml_in_barrels"]))
-        dark_percentage = random.randint(0, min(100 - red_percentage - blue_percentage - green_percentage,
-                                                inventory["dark_ml_in_barrels"]))
+    # Calculating the total inventory for potion components
+    total_inventory = sum(inventory[component] for component in potion_components if component in inventory)
+    print(f"Total inventory for potion components: {total_inventory}ml")
 
-        # Determine the quantity for this batch based on the smallest amount necessary according to percentages.
-        quantity = min(inventory["red_ml_in_barrels"] * red_percentage // 100,
-                       inventory["blue_ml_in_barrels"] * blue_percentage // 100,
-                       inventory["green_ml_in_barrels"] * green_percentage // 100,
-                       inventory["dark_ml_in_barrels"] * dark_percentage // 100)
+    if total_inventory < 100:
+        print("Not enough materials to make a 100ml potion.")
+        raise HTTPException(status_code=400, detail="Not enough inventory to create a 100ml potion.")
 
-        # If we have a valid potion, add it to the brew list
-        if quantity > 0:
-            potion_to_add = {"potion_type": [red_percentage, blue_percentage, green_percentage, dark_percentage],
-                             "quantity": quantity}
-            potions_to_brew.append(potion_to_add)
+    # Filter out the unavailable (zero inventory) components before planning the potions
+    available_components = [component for component in potion_components if inventory.get(component, 0) > 0]
+    print("Available components:", available_components)
 
-            # Recalculate the total inventory.
-            total_inventory = sum(inventory.values())
-        else:
-            break  # No potions can be made, exit the loop.
+    if not available_components:
+        print("No components available to create a potion.")
+        raise HTTPException(status_code=400, detail="No components available to create a potion.")
 
-    # Check if the total inventory is less than 100ml, and if not, raise an exception.
-    if total_inventory >= 100:
-        raise HTTPException(status_code=400, detail="The total inventory could not be reduced below 100ml.")
+    # Calculate how many potions we can plan with the current inventory
+    num_potions = total_inventory // 100
+    print(f"Planning to create {num_potions} potion(s)")
 
-    print("Final potions to brew:", potions_to_brew)
-    print("Updated inventory:", inventory)
+    for potion_num in range(num_potions):
+        print(f"\nCreating plan for potion {potion_num + 1}:")
+        remaining = 100  # We want the sum of components to be 100 for each potion.
+        potion_mix = {}
+
+        for i, component in enumerate(available_components):
+            available = inventory.get(component, 0)  # Get available inventory for this component.
+            print(f"Inventory available for '{component}': {available}ml")
+
+            if i == len(available_components) - 1:
+                # If this is the last component, assign whatever is left to make the total 100.
+                potion_mix[component] = remaining
+                print(f"All remaining {remaining}ml assigned to '{component}'")
+            else:
+                # Randomly determine the component's share, but leave enough space to ensure
+                # that the remaining components can still fill up to 100.
+                space_for_others = len(available_components) - (i + 1)
+                max_share = min(available, remaining - space_for_others)  # Can't use more than what's available.
+                component_share = random.randint(1, max_share)  # At least 1 to ensure this component is present.
+
+                print(f"Randomly selected {component_share}ml for '{component}'")
+                potion_mix[component] = component_share
+                remaining -= component_share
+
+        # If we've reached this point, it means we have a valid potion mix for this iteration.
+        print(f"\nGenerated potion mix for potion {potion_num + 1}: {potion_mix}")
+        potions_to_brew.append({"potion_type": potion_mix, "quantity": 1})
+
+    # Final report on potion planning
+    print("\nCompleted potion planning. Summary:")
+    for i, potion_plan in enumerate(potions_to_brew):
+        print(f"Potion {i + 1}: {potion_plan}")
 
     return potions_to_brew
+
+
+InventoryLedgerEntries = Base.classes.inventory_ledger_entries
+GlobalCatalog = Base.classes.global_catalog
