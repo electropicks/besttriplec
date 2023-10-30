@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session
 
 from src.api import auth
 from src.api.audit import get_inventory
-from src.database import SessionLocal, Base
+from src.database import SessionLocal, Base, get_db
 
 router = APIRouter(
     prefix="/bottler",
@@ -16,12 +16,7 @@ router = APIRouter(
 )
 
 
-def get_db():
-    db = SessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
+
 
 
 # Assuming that your database's metadata is defined in your actual application
@@ -83,15 +78,12 @@ async def post_deliver_bottles(potions_delivered: list[PotionInventory], db: Ses
         )
         db.add(potion_ledger_entry)
 
-        # ... [Code for updating the global inventory and inventory ledger as previously described] ...
-
     # Commit the session to save all changes
     db.commit()
 
     return {"message": "Delivery processed and inventories updated successfully."}
 
 
-# Gets called 4 times a day
 @router.post("/plan")
 async def get_bottle_plan():
     """
@@ -103,7 +95,6 @@ async def get_bottle_plan():
     potions_to_brew = []
     potion_components = ['red_ml_in_barrels', 'blue_ml_in_barrels', 'green_ml_in_barrels', 'dark_ml_in_barrels']
 
-    # Calculating the total inventory for potion components
     total_inventory = sum(inventory[component] for component in potion_components if component in inventory)
     print(f"Total inventory for potion components: {total_inventory}ml")
 
@@ -111,7 +102,6 @@ async def get_bottle_plan():
         print("Not enough materials to make a 100ml potion.")
         raise HTTPException(status_code=400, detail="Not enough inventory to create a 100ml potion.")
 
-    # Filter out the unavailable (zero inventory) components before planning the potions
     available_components = [component for component in potion_components if inventory.get(component, 0) > 0]
     print("Available components:", available_components)
 
@@ -119,39 +109,32 @@ async def get_bottle_plan():
         print("No components available to create a potion.")
         raise HTTPException(status_code=400, detail="No components available to create a potion.")
 
-    # Calculate how many potions we can plan with the current inventory
     num_potions = total_inventory // 100
     print(f"Planning to create {num_potions} potion(s)")
 
     for potion_num in range(num_potions):
         print(f"\nCreating plan for potion {potion_num + 1}:")
-        remaining = 100  # We want the sum of components to be 100 for each potion.
-        potion_mix = {}
+        remaining = 100
+        potion_mix = [0, 0, 0, 0]  # Initializing the potion mix array with zeros for red, green, blue, and dark.
 
         for i, component in enumerate(available_components):
-            available = inventory.get(component, 0)  # Get available inventory for this component.
+            available = inventory.get(component, 0)
             print(f"Inventory available for '{component}': {available}ml")
 
             if i == len(available_components) - 1:
-                # If this is the last component, assign whatever is left to make the total 100.
-                potion_mix[component] = remaining
+                potion_mix[i] = remaining
                 print(f"All remaining {remaining}ml assigned to '{component}'")
             else:
-                # Randomly determine the component's share, but leave enough space to ensure
-                # that the remaining components can still fill up to 100.
                 space_for_others = len(available_components) - (i + 1)
-                max_share = min(available, remaining - space_for_others)  # Can't use more than what's available.
-                component_share = random.randint(1, max_share)  # At least 1 to ensure this component is present.
-
+                max_share = min(available, remaining - space_for_others)
+                component_share = random.randint(1, max_share)
                 print(f"Randomly selected {component_share}ml for '{component}'")
-                potion_mix[component] = component_share
+                potion_mix[i] = component_share
                 remaining -= component_share
 
-        # If we've reached this point, it means we have a valid potion mix for this iteration.
         print(f"\nGenerated potion mix for potion {potion_num + 1}: {potion_mix}")
         potions_to_brew.append({"potion_type": potion_mix, "quantity": 1})
 
-    # Final report on potion planning
     print("\nCompleted potion planning. Summary:")
     for i, potion_plan in enumerate(potions_to_brew):
         print(f"Potion {i + 1}: {potion_plan}")

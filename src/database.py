@@ -1,5 +1,3 @@
-
-
 import os
 
 import dotenv
@@ -22,6 +20,15 @@ Base.prepare(engine, reflect=True)
 
 # Create a session-maker
 SessionLocal = sessionmaker(bind=engine)
+
+
+def get_db():
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
+
 
 print(Base.classes.keys())
 # For example, if you have a 'user' table, you can access it as:
