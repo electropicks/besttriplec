@@ -1,5 +1,6 @@
-from fastapi import APIRouter, Depends, Request
-from pydantic import BaseModel
+from fastapi import APIRouter, Depends
+from sqlalchemy.orm import Session
+
 from src.api import auth
 from src import database as db
 import sqlalchemy
@@ -11,11 +12,21 @@ router = APIRouter(
 )
 
 @router.post("/reset")
-def reset():
+def reset(db: Session = Depends(db.get_db)):
     """
     Reset the game state. Gold goes to 100, all potions are removed from
     inventory, and all barrels are removed from inventory. Carts are all reset.
     """
+    db.query(db.GlobalInventory).update(
+        {
+            "red_ml": 0,
+            "green_ml": 0,
+            "blue_ml": 0,
+            "dark_ml": 0,
+            "checking_gold": 100,
+            "saving_gold": 0,
+        })
+
     clear_inventory_sql = sqlalchemy.text(
         "update global_inventory set \
          red_ml = 0, \

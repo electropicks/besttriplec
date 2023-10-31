@@ -1,10 +1,13 @@
-import sqlalchemy
+from datetime import datetime
+from enum import Enum
+
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
+from sqlalchemy import asc, desc
+from sqlalchemy.orm import Session
 
-from src import database as db
 from src.api import auth
-from enum import Enum
+from src.database import GlobalCatalog, OrderHistory, GlobalInventory, GlobalCarts, get_db
 
 router = APIRouter(
     prefix="/carts",
@@ -12,61 +15,78 @@ router = APIRouter(
     dependencies=[Depends(auth.get_api_key)],
 )
 
+
 class search_sort_options(str, Enum):
     customer_name = "customer_name"
     item_sku = "item_sku"
     line_item_total = "line_item_total"
     timestamp = "timestamp"
 
+
 class search_sort_order(str, Enum):
     asc = "asc"
-    desc = "desc"   
+    desc = "desc"
+
+
+class Order(BaseModel):
+    order_id: int
+    potion_sku: str
+    customer_name: str
+    price: int
+    checkout_time: datetime
+
+    def __str__(self):
+        return f"Order({self.order_id}, {self.potion_sku}, {self.customer_name}, {self.price}, {self.checkout_time})"
+
+    def __repr__(self):
+        return self.__str__()
+
 
 @router.get("/search/", tags=["search"])
 def search_orders(
-    customer_name: str = "",
-    potion_sku: str = "",
-    search_page: str = "",
-    sort_col: search_sort_options = search_sort_options.timestamp,
-    sort_order: search_sort_order = search_sort_order.desc,
+        customer_name: str = "",
+        item_sku: str = "",
+        search_page: int = 1,
+        sort_col: search_sort_options = search_sort_options.timestamp,
+        sort_order: search_sort_order = search_sort_order.desc,
+        db: Session = Depends(get_db)
 ):
-    """
-    Search for cart line items by customer name and/or potion sku.
+    # Define the sorting direction
+    if sort_order == search_sort_order.asc:
+        order_direction = asc
+    else:
+        order_direction = desc
 
-    Customer name and potion sku filter to orders that contain the 
-    string (case insensitive). If the filters aren't provided, no
-    filtering occurs on the respective search term.
+    # Query the database
+    orders_query = db.query(OrderHistory)
+    if customer_name:
+        orders_query = orders_query.filter(OrderHistory.customer_name.ilike(f"%{customer_name}%"))
+    if item_sku:
+        orders_query = orders_query.filter(OrderHistory.potion_sku.ilike(f"%{item_sku}%"))
 
-    Search page is a cursor for pagination. The response to this
-    search endpoint will return previous or next if there is a
-    previous or next page of results available. The token passed
-    in that search response can be passed in the next search request
-    as search page to get that page of results.
+    # Apply sorting
+    orders_query = orders_query.order_by(order_direction(getattr(OrderHistory, translateTerms(sort_col.value))))
 
-    Sort col is which column to sort by and sort order is the direction
-    of the search. They default to searching by timestamp of the order
-    in descending order.
+    # Implement pagination
+    PAGE_SIZE = 5
+    offset = (search_page - 1) * PAGE_SIZE
+    orders = orders_query.limit(PAGE_SIZE).offset(offset).all()
 
-    The response itself contains a previous and next page token (if
-    such pages exist) and the results as an array of line items. Each
-    line item contains the line item id (must be unique), item sku, 
-    customer name, line item total (in gold), and timestamp of the order.
-    Your results must be paginated, the max results you can return at any
-    time is 5 total line items.
-    """
+    # Determine if there are previous or next pages
+    previous_page = search_page - 1 if search_page > 1 else None
+    next_page = search_page + 1 if len(orders) == PAGE_SIZE + 1 else None
+
+    # Format the results
+    results = [{"order_id": order.order_id,
+                "item_sku": order.potion_sku,
+                "customer_name": order.customer_name,
+                "line_item_total": order.price,
+                "timestamp": order.checkout_time.isoformat()} for order in orders]
 
     return {
-        "previous": "",
-        "next": "",
-        "results": [
-            {
-                "line_item_id": 1,
-                "item_sku": "1 oblivion potion",
-                "customer_name": "Scaramouche",
-                "line_item_total": 50,
-                "timestamp": "2021-01-01T00:00:00Z",
-            }
-        ],
+        "previous": previous_page,
+        "next": next_page,
+        "results": results
     }
 
 
@@ -75,42 +95,21 @@ class NewCart(BaseModel):
 
 
 @router.post("/")
-def create_cart(new_cart: NewCart):
-    """ """
-    print("calling create_cart with new_cart:", new_cart)
-    customer_name = new_cart.customer
-    create_cart_sql = sqlalchemy.text(
-        "insert into global_carts(customer_name, created_at) values(:customer_name, now())"
-    )
-    print("create_cart_sql:", create_cart_sql)
-    get_cart_id_sql = sqlalchemy.text(
-        "select max(cart_id) from global_carts where customer_name = :customer_name"
-    )
-    with db.engine.begin() as connection:
-        connection.execute(create_cart_sql, {"customer_name": customer_name})
-        print("Executed create_cart_sql")
-        cart_id = connection.execute(get_cart_id_sql, {"customer_name": customer_name}).one()[0]
-        print("Executed get_cart_id_sql")
-    payload = {"cart_id": cart_id}
-    print(payload)
-    return payload
+def create_cart(new_cart: NewCart, db: Session = Depends(get_db)):
+    cart = GlobalCarts(customer_name=new_cart.customer, created_at=datetime.utcnow())
+    db.add(cart)
+    db.commit()
+    db.refresh(cart)
+    print("Created cart: ", cart.cart_id)
+    return {"cart_id": cart.cart_id}
 
 
 @router.get("/{cart_id}")
-def get_cart(cart_id: int):
-    """ """
-    print("calling get_cart with cart_id:", cart_id)
-    get_cart_sql = sqlalchemy.text("select * from global_carts where cart_id = {}".format(cart_id))
-    print("get_cart_sql:", get_cart_sql)
-    with db.engine.begin() as connection:
-        try:
-            result = connection.execute(get_cart_sql).one()
-        except sqlalchemy.exc.NoResultFound:
-            raise HTTPException(status_code=404, detail="Item not found")
-    payload = {"customer": result[1]}
-    print(payload)
-
-    return payload
+def get_cart(cart_id: int, db: Session = Depends(get_db)):
+    cart = db.query(GlobalCarts).filter_by(cart_id=cart_id).first()
+    if not cart:
+        raise HTTPException(status_code=404, detail="Item not found")
+    return {"customer": cart.customer_name}
 
 
 class CartItem(BaseModel):
@@ -118,61 +117,34 @@ class CartItem(BaseModel):
 
 
 @router.post("/{cart_id}/items/{item_sku}")
-def set_item_quantity(cart_id: int, item_sku: str, cart_item: CartItem):
+def set_item_quantity(cart_id: int, item_sku: str, cart_item: CartItem, db: Session = Depends(get_db)):
     """ """
-    print("Calling set_item_quantity:", "cart_id:", cart_id, "item_sku:", item_sku, "cart_item:", cart_item)
+    cart_items = db.query(CartItem).filter_by(cart_id=cart_id, sku=item_sku).all()
+    catalog_item = db.query(GlobalCatalog).filter_by(sku=item_sku).first()
 
-    # check if item is already in cart
-    get_item_sql = sqlalchemy.text(
-        "select * from global_cart_items where cart_id = :cart_id and sku = :sku"
-    )
-    print("get_item_sql:", get_item_sql)
-    # update catalog quantity
-    update_catalog_sql = sqlalchemy.text(
-        "update global_catalog set quantity = quantity - :quantity where sku = :sku"
-    )
-    with db.engine.begin() as connection:
-        connection.execute(update_catalog_sql, {"quantity": cart_item.quantity, "sku": item_sku})
-        print("Executed update_catalog_sql")
-        result = connection.execute(get_item_sql, {"cart_id": cart_id, "sku": item_sku}).fetchall()
-        print("Executed get_item_sql")
-        if len(result) == 0:
-            # add item to cart
-            add_item_sql = sqlalchemy.text(
-                "insert into global_cart_items(cart_id, sku, quantity, price) values(:cart_id, :sku, :quantity, 50 * :quantity)"
-            )
-            print("add_item_sql:", add_item_sql)
-            connection.execute(
-                add_item_sql,
-                {"cart_id": cart_id, "sku": item_sku, "quantity": cart_item.quantity},
-            )
-            print("Executed add_item_sql")
-        else:
-            # update item in cart
-            update_item_sql = sqlalchemy.text(
-                "update global_cart_items set \
-                quantity = quantity + :quantity, \
-                price = price + 50 \
-                where cart_id = :cart_id and sku = :sku"
-            )
-            print("update_item_sql:", update_item_sql)
-            connection.execute(
-                update_item_sql,
-                {"cart_id": cart_id, "sku": item_sku, "quantity": cart_item.quantity},
-            )
-            print("Executed update_item_sql")
-        # check if needed to clear catalog row
-        get_catalog_quantity_sql = sqlalchemy.text(
-            "select quantity from global_catalog where sku = :sku"
-        )
-        print("get_catalog_quantity_sql:", get_catalog_quantity_sql)
-        catalog_quantity = connection.execute(get_catalog_quantity_sql, {"sku": item_sku}).one()[0]
-        print("Executed get_catalog_quantity_sql")
-        if catalog_quantity == 0:
-            delete_catalog_sql = sqlalchemy.text("delete from global_catalog where sku = :sku")
-            print("delete_catalog_sql:", delete_catalog_sql)
-            connection.execute(delete_catalog_sql, {"sku": item_sku})
-            print("Executed delete_catalog_sql")
+    if not catalog_item:
+        raise HTTPException(status_code=404, detail="Catalog item not found")
+
+    # Update catalog quantity
+    catalog_item.quantity -= cart_item.quantity
+
+    if len(cart_items) == 0:
+        # Add item to cart
+        new_cart_item = CartItem(cart_id=cart_id, sku=item_sku, quantity=cart_item.quantity,
+                                 price=50 * cart_item.quantity)
+        db.add(new_cart_item)
+    else:
+        # Update item in cart
+        for item in cart_items:
+            item.quantity += cart_item.quantity
+            item.price += 50 * cart_item.quantity
+
+    # Remove catalog item if quantity is zero
+    if catalog_item.quantity == 0:
+        db.delete(catalog_item)
+
+    db.commit()
+
     return "OK"
 
 
@@ -181,55 +153,46 @@ class CartCheckout(BaseModel):
 
 
 @router.post("/{cart_id}/checkout")
-def checkout(cart_id: int, cart_checkout: CartCheckout):
-    """ """
-    cart = get_cart(cart_id)
+def checkout(cart_id: int, cart_checkout: CartCheckout, db: Session = Depends(get_db)):
+    cart = db.query(GlobalCarts).filter_by(id=cart_id).first()
+    if not cart:
+        raise HTTPException(status_code=404, detail="Cart not found")
+
+    cart_items = db.query(CartItem).filter_by(cart_id=cart_id).all()
+
     potions_bought = 0
     gold_paid = 0
-    print("Calling checkout:", "cart_id:", cart_id, "cart_checkout:", cart_checkout)
-    get_items_sql = sqlalchemy.text("select * from global_cart_items where cart_id = :cart_id")
-    print("get_items_sql:", get_items_sql)
-    with db.engine.begin() as connection:
-        result = connection.execute(get_items_sql, {"cart_id": cart_id}).fetchall()
-        print("Executed get_items_sql")
-        if len(result) == 0:
-            raise HTTPException(status_code=404, detail="Cart not found")
-        for row in result:
-            quantity = row[2]
-            price = row[3]
-            sku = row[4]
-            potions_bought += quantity
-            gold_paid += price
-            print("Current item, sku, quantity, price:", row, sku, quantity, price)
-            # delete item from cart
-            delete_item_sql = sqlalchemy.text(
-                "delete from global_cart_items where cart_id = :cart_id and sku = :sku"
-            )
-            print("delete_item_sql:", delete_item_sql)
-            connection.execute(delete_item_sql, {"cart_id": cart_id, "sku": sku})
-            print("Executed delete_item_sql")
-            # add order to order_history
-            add_order_sql = sqlalchemy.text(
-                "insert into order_history(customer_name, potion_sku, quantity, checkout_time, price, payment) \
-                values(:customer_name, :potion_sku, :quantity, now(), :price, :payment)"
-            )
-            print("add_order_sql:", add_order_sql)
-            connection.execute(
-                add_order_sql,
-                {"customer_name": cart['customer'], "potion_sku": sku, "quantity": quantity, "price": price,
-                 "payment": cart_checkout.payment},
-            )
-            print("Executed add_order_sql")
-        # update inventory
-        update_inventory_sql = sqlalchemy.text(
-            "update global_inventory set checking_gold = checking_gold + :gold_paid"
-        )
-        print("update_inventory_sql:", update_inventory_sql)
-        connection.execute(update_inventory_sql, {"gold_paid": gold_paid})
-        print("Executed update_inventory_sql")
-        # delete cart
-        delete_cart_sql = sqlalchemy.text("delete from global_carts where cart_id = :cart_id")
-        print("delete_cart_sql:", delete_cart_sql)
-        connection.execute(delete_cart_sql, {"cart_id": cart_id})
+
+    for item in cart_items:
+        # Add order to order history
+        new_order = OrderHistory(customer_name=cart.customer_name, potion_sku=item.sku, quantity=item.quantity,
+                                 checkout_time=datetime.utcnow(), price=item.price, payment=cart_checkout.payment)
+        db.add(new_order)
+
+        potions_bought += item.quantity
+        gold_paid += item.price
+
+        # Update inventory
+        inventory_item = db.query(GlobalInventory).first()
+        if inventory_item:
+            inventory_item.checking_gold += gold_paid
+
+        # Delete item from cart
+        db.delete(item)
+
+    # Delete the cart
+    db.delete(cart)
+
+    db.commit()
 
     return {"total_potions_bought": potions_bought, "total_gold_paid": gold_paid}
+
+
+def translateTerms(sort_col: str):
+    if sort_col == "customer_name":
+        return "customer_name"
+    if sort_col == "item_sku":
+        return "potion_sku"
+    if sort_col == "line_item_total":
+        return "price"
+    return "checkout_time"

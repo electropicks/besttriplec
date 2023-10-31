@@ -37,3 +37,11 @@ GlobalCarts = Base.classes.global_carts
 GlobalCartItems = Base.classes.global_cart_items
 GlobalInventory = Base.classes.global_inventory
 OrderHistory = Base.classes.order_history
+InventoryLedgerEntries = Base.classes.inventory_ledger_entries
+GlobalCatalog = Base.classes.global_catalog
+PotionLedgerEntries = Base.classes.potion_ledger_entries
+
+InventoryLedgerEntries = Base.classes.inventory_ledger_entries
+GlobalCatalog = Base.classes.global_catalog
+PotionLedgerEntries = Base.classes.potion_ledger_entries
+

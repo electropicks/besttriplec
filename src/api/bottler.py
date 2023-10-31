@@ -2,21 +2,17 @@ import random
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
-from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from src.api import auth
 from src.api.audit import get_inventory
-from src.database import SessionLocal, Base, get_db
+from src.database import get_db, PotionLedgerEntries, GlobalCatalog, GlobalInventory
 
 router = APIRouter(
     prefix="/bottler",
     tags=["bottler"],
     dependencies=[Depends(auth.get_api_key)],
 )
-
-
-
 
 
 # Assuming that your database's metadata is defined in your actual application
@@ -140,9 +136,3 @@ async def get_bottle_plan():
         print(f"Potion {i + 1}: {potion_plan}")
 
     return potions_to_brew
-
-
-InventoryLedgerEntries = Base.classes.inventory_ledger_entries
-GlobalCatalog = Base.classes.global_catalog
-GlobalInventory = Base.classes.global_inventory
-PotionLedgerEntries = Base.classes.potion_ledger_entries
