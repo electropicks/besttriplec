@@ -60,8 +60,10 @@ def search_orders(
     # Query the database
     orders_query = db.query(OrderHistory)
     if customer_name:
+        print("applying customer_name filter")
         orders_query = orders_query.filter(OrderHistory.customer_name.ilike(f"%{customer_name}%"))
     if item_sku:
+        print("applying item_sku filter")
         orders_query = orders_query.filter(OrderHistory.potion_sku.ilike(f"%{item_sku}%"))
 
     # Apply sorting
