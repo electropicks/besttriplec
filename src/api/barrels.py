@@ -4,7 +4,6 @@ from dataclasses import dataclass
 from random import randint
 from typing import cast
 
-import sqlalchemy
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel
 from sqlalchemy import update
@@ -51,16 +50,6 @@ class Barrel(BaseModel):
 @router.post("/deliver")
 def post_deliver_barrels(barrels_delivered: list[Barrel], db: Session = Depends(db.get_db)):
     """ """
-    # Logging the professor's call
-    prof_call = ProfessorCalls(
-        endpoint="barrels/deliver",
-        arguments={
-            "barrels_delivered": barrels_delivered
-        }
-    )
-    db.add(prof_call)
-    db.commit()
-
     # Loop through barrels delivered and update the global_inventory using ORM
     for barrel in barrels_delivered:
         if barrel.potion_type == [1, 0, 0, 0]:
@@ -103,6 +92,57 @@ def post_deliver_barrels(barrels_delivered: list[Barrel], db: Session = Depends(
             )
             db.execute(stmt)
 
+        # Loop through barrels delivered and update the global_inventory using ORM
+    for barrel in barrels_delivered:
+        if barrel.potion_type == [1, 0, 0, 0]:
+            stmt = (
+                update(GlobalInventory)
+                .values(
+                    red_ml=GlobalInventory.red_ml + barrel.ml_per_barrel * barrel.quantity,
+                    checking_gold=GlobalInventory.checking_gold - barrel.price * barrel.quantity
+                )
+            )
+            db.execute(stmt)
+
+        elif barrel.potion_type == [0, 1, 0, 0]:
+            stmt = (
+                update(GlobalInventory)
+                .values(
+                    green_ml=GlobalInventory.green_ml + barrel.ml_per_barrel * barrel.quantity,
+                    checking_gold=GlobalInventory.checking_gold - barrel.price * barrel.quantity
+                )
+            )
+            db.execute(stmt)
+
+        elif barrel.potion_type == [0, 0, 1, 0]:
+            stmt = (
+                update(GlobalInventory)
+                .values(
+                    blue_ml=GlobalInventory.blue_ml + barrel.ml_per_barrel * barrel.quantity,
+                    checking_gold=GlobalInventory.checking_gold - barrel.price * barrel.quantity
+                )
+            )
+            db.execute(stmt)
+
+        elif barrel.potion_type == [0, 0, 0, 1]:
+            stmt = (
+                update(GlobalInventory)
+                .values(
+                    dark_ml=GlobalInventory.dark_ml + barrel.ml_per_barrel * barrel.quantity,
+                    checking_gold=GlobalInventory.checking_gold - barrel.price * barrel.quantity
+                )
+            )
+            db.execute(stmt)
+
+    # Logging the professor's call
+    prof_call = ProfessorCalls(
+        endpoint="barrels/deliver",
+        arguments={
+            "barrels_delivered": barrels_delivered
+        },
+        response="OK"
+    )
+    db.add(prof_call)
     db.commit()
 
     return "OK"
