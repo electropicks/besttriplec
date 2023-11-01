@@ -82,8 +82,8 @@ async def post_deliver_bottles(potions_delivered: list[PotionInventory], db: Ses
         endpoint="bottler/deliver",
         arguments={
             "potions_delivered": potions_delivered,
-            "response": "Delivery processed and inventories updated successfully."
-        }
+        },
+        response="Delivery processed and inventories updated successfully."
     )
     db.add(prof_call)
     db.commit()
