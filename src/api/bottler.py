@@ -2,6 +2,7 @@ import random
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
+from sqlalchemy import and_
 from sqlalchemy.orm import Session
 
 from src.api import auth
@@ -26,15 +27,6 @@ async def post_deliver_bottles(potions_delivered: list[PotionInventory], db: Ses
     """Receive deliveries of new potions, update the inventory, global catalog, and ledgers."""
 
     # Set a seller ID based on your business logic. For this example, it's a fixed value.
-    prof_call = ProfessorCalls(
-        endpoint="bottler/deliver",
-        arguments= {
-            "potions_delivered": potions_delivered
-        }
-    )
-    db.add(prof_call)
-    db.flush()
-
     seller_id = "besttriplec"
 
     # Retrieve the seller's global inventory
@@ -50,10 +42,12 @@ async def post_deliver_bottles(potions_delivered: list[PotionInventory], db: Ses
 
         # Check if this potion type already exists in the global catalog
         existing_potion = db.query(GlobalCatalog).filter(
-            (GlobalCatalog.red_ml == red_ml) &
-            (GlobalCatalog.green_ml == green_ml) &
-            (GlobalCatalog.blue_ml == blue_ml) &
-            (GlobalCatalog.dark_ml == dark_ml)
+            and_(
+                GlobalCatalog.red_ml == red_ml,
+                GlobalCatalog.green_ml == green_ml,
+                GlobalCatalog.blue_ml == blue_ml,
+                GlobalCatalog.dark_ml == dark_ml
+            )
         ).first()
 
         if existing_potion:
@@ -84,6 +78,14 @@ async def post_deliver_bottles(potions_delivered: list[PotionInventory], db: Ses
         db.add(potion_ledger_entry)
 
     # Commit the session to save all changes
+    prof_call = ProfessorCalls(
+        endpoint="bottler/deliver",
+        arguments={
+            "potions_delivered": potions_delivered,
+            "response": "Delivery processed and inventories updated successfully."
+        }
+    )
+    db.add(prof_call)
     db.commit()
 
     return {"message": "Delivery processed and inventories updated successfully."}
@@ -94,13 +96,6 @@ async def get_bottle_plan(db: Session = Depends(get_db)):
     """
     Create a potion mix with random components ensuring the total is always 100ml.
     """
-    prof_call = ProfessorCalls(
-        endpoint="bottler/plan",
-        arguments={}
-    )
-    db.add(prof_call)
-    db.commit()
-
     inventory = get_inventory()  # This function should retrieve the current inventory status
     print("Starting with inventory:", inventory)
 
@@ -152,5 +147,13 @@ async def get_bottle_plan(db: Session = Depends(get_db)):
     print("\nCompleted potion planning. Summary:")
     for i, potion_plan in enumerate(potions_to_brew):
         print(f"Potion {i + 1}: {potion_plan}")
+
+    prof_call = ProfessorCalls(
+        endpoint="bottler/plan",
+        arguments={},
+        response=str(potions_to_brew)
+    )
+    db.add(prof_call)
+    db.commit()
 
     return potions_to_brew
