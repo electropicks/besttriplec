@@ -2,16 +2,18 @@ import math
 from collections import defaultdict
 from dataclasses import dataclass
 from random import randint
+from typing import cast
 
 import sqlalchemy
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel
+from sqlalchemy import update
 from sqlalchemy.orm import Session
 
 from src import database as db
 from src.api import auth
 from src.api.audit import get_inventory
-from src.database import ProfessorCalls
+from src.database import ProfessorCalls, GlobalInventory, get_db
 
 router = APIRouter(
     prefix="/barrels",
@@ -49,77 +51,59 @@ class Barrel(BaseModel):
 @router.post("/deliver")
 def post_deliver_barrels(barrels_delivered: list[Barrel], db: Session = Depends(db.get_db)):
     """ """
-
+    # Logging the professor's call
     prof_call = ProfessorCalls(
         endpoint="barrels/deliver",
-        arguments= {
+        arguments={
             "barrels_delivered": barrels_delivered
         }
     )
     db.add(prof_call)
     db.commit()
 
-    print("barrels_delivered", barrels_delivered)
+    # Loop through barrels delivered and update the global_inventory using ORM
+    for barrel in barrels_delivered:
+        if barrel.potion_type == [1, 0, 0, 0]:
+            stmt = (
+                update(GlobalInventory)
+                .values(
+                    red_ml=GlobalInventory.red_ml + barrel.ml_per_barrel * barrel.quantity,
+                    checking_gold=GlobalInventory.checking_gold - barrel.price * barrel.quantity
+                )
+            )
+            db.execute(stmt)
 
-    with db.engine.begin() as connection:
-        for barrel in barrels_delivered:
-            if barrel.potion_type == [1, 0, 0, 0]:
-                buy_red_barrel_sql = sqlalchemy.text(
-                    "update global_inventory set \
-                    red_ml = red_ml + :ml_per_barrel * :quantity, \
-                    checking_gold = checking_gold - :price * :quantity"
+        elif barrel.potion_type == [0, 1, 0, 0]:
+            stmt = (
+                update(GlobalInventory)
+                .values(
+                    green_ml=GlobalInventory.green_ml + barrel.ml_per_barrel * barrel.quantity,
+                    checking_gold=GlobalInventory.checking_gold - barrel.price * barrel.quantity
                 )
-                params = {
-                    "ml_per_barrel": barrel.ml_per_barrel,
-                    "quantity": barrel.quantity,
-                    "price": barrel.price
-                }
-                print("buy_red_barrel_sql:", buy_red_barrel_sql)
-                connection.execute(buy_red_barrel_sql, params)
-                print("Executed buy_red_barrel_sql")
+            )
+            db.execute(stmt)
 
-            elif barrel.potion_type == [0, 1, 0, 0]:
-                buy_green_barrel_sql = sqlalchemy.text(
-                    "update global_inventory set green_ml = green_ml + :ml_per_barrel * :quantity, \
-                    checking_gold = checking_gold - :price * :quantity"
+        elif barrel.potion_type == [0, 0, 1, 0]:
+            stmt = (
+                update(GlobalInventory)
+                .values(
+                    blue_ml=GlobalInventory.blue_ml + barrel.ml_per_barrel * barrel.quantity,
+                    checking_gold=GlobalInventory.checking_gold - barrel.price * barrel.quantity
                 )
-                params = {
-                    "ml_per_barrel": barrel.ml_per_barrel,
-                    "quantity": barrel.quantity,
-                    "price": barrel.price
-                }
-                print("buy_green_barrel_sql:", buy_green_barrel_sql)
-                connection.execute(buy_green_barrel_sql, params)
-                print("Executed buy_green_barrel_sql")
+            )
+            db.execute(stmt)
 
-            elif barrel.potion_type == [0, 0, 1, 0]:
-                buy_blue_barrel_sql = sqlalchemy.text(
-                    "update global_inventory set \
-                    blue_ml = blue_ml + :ml_per_barrel * :quantity, \
-                    checking_gold = checking_gold - :price * :quantity"
+        elif barrel.potion_type == [0, 0, 0, 1]:
+            stmt = (
+                update(GlobalInventory)
+                .values(
+                    dark_ml=GlobalInventory.dark_ml + barrel.ml_per_barrel * barrel.quantity,
+                    checking_gold=GlobalInventory.checking_gold - barrel.price * barrel.quantity
                 )
-                params = {
-                    "ml_per_barrel": barrel.ml_per_barrel,
-                    "quantity": barrel.quantity,
-                    "price": barrel.price
-                }
-                print("buy_blue_barrel_sql:", buy_blue_barrel_sql)
-                connection.execute(buy_blue_barrel_sql, params)
-                print("Executed buy_blue_barrel_sql")
-            elif barrel.potion_type == [0, 0, 0, 1]:
-                buy_dark_barrel_sql = sqlalchemy.text(
-                    "update global_inventory set \
-                    dark_ml = dark_ml + :ml_per_barrel * :quantity, \
-                    checking_gold = checking_gold - :price * :quantity"
-                )
-                params = {
-                    "ml_per_barrel": barrel.ml_per_barrel,
-                    "quantity": barrel.quantity,
-                    "price": barrel.price
-                }
-                print("buy_dark_barrel_sql:", buy_dark_barrel_sql)
-                connection.execute(buy_dark_barrel_sql, params)
-                print("Executed buy_dark_barrel_sql")
+            )
+            db.execute(stmt)
+
+    db.commit()
 
     return "OK"
 
@@ -139,100 +123,68 @@ def get_best_barrel_sku_and_price(barrels: dict[str, Barrel], gold_remaining: in
 
 
 # Gets called once a day
-@router.post("/plan")
-def get_wholesale_purchase_plan(wholesale_catalog: list[Barrel]):
-    """ """
+def purchase_barrels(priority_option, wholesale_barrels, gold_remaining, to_buy):
+    best_barrel = get_best_barrel_sku_and_price(wholesale_barrels[priority_option.color], gold_remaining)
+    if best_barrel:
+        to_buy[best_barrel.sku] += 1
+        gold_remaining -= best_barrel.price
+        priority_option.score += best_barrel.ml_per_barrel
+        wholesale_barrels[priority_option.color][best_barrel.sku].quantity -= 1
+        if wholesale_barrels[priority_option.color][best_barrel.sku].quantity == 0:
+            del wholesale_barrels[priority_option.color][best_barrel.sku]
+        if not wholesale_barrels[priority_option.color]:
+            priority_option.score = math.inf
+    return gold_remaining, to_buy
+
+
+def get_wholesale_purchase(wholesale_catalog: list[Barrel], db: Session = Depends(get_db)):
     print(wholesale_catalog)
     inventory = get_inventory()
     print("inventory:", inventory)
-    wholesale_red_barrels = list(filter(lambda barrel: barrel.potion_type == [1, 0, 0, 0], wholesale_catalog))
-    wholesale_red_barrels = {barrel.sku: barrel for barrel in wholesale_red_barrels}
-    wholesale_green_barrels = list(filter(lambda barrel: barrel.potion_type == [0, 1, 0, 0], wholesale_catalog))
-    wholesale_green_barrels = {barrel.sku: barrel for barrel in wholesale_green_barrels}
-    wholesale_blue_barrels = list(filter(lambda barrel: barrel.potion_type == [0, 0, 1, 0], wholesale_catalog))
-    wholesale_blue_barrels = {barrel.sku: barrel for barrel in wholesale_blue_barrels}
-    print("wholesale_red_barrels:", wholesale_red_barrels)
-    print("wholesale_green_barrels:", wholesale_green_barrels)
-    print("wholesale_blue_barrels:", wholesale_blue_barrels)
+
+    # Map potion types to colors
+    potion_type_to_color = {
+        (1, 0, 0, 0): RED,
+        (0, 1, 0, 0): GREEN,
+        (0, 0, 1, 0): BLUE
+    }
+
+    # Organize barrels by potion type
+    wholesale_barrels = defaultdict(dict)
+    for barrel in wholesale_catalog:
+        color = potion_type_to_color[cast(tuple[int, int, int, int], tuple(barrel.potion_type))]
+
+        wholesale_barrels[color][barrel.sku] = barrel
 
     gold_remaining = inventory["gold"]
     print("gold_remaining:", gold_remaining)
 
-    # red_score = Option(RED, inventory["number_of_red_potions"] * 100 + inventory["red_ml_in_barrels"])
-    # red_score = Option(RED, 100000)
-    # green_score = Option(GREEN, inventory["number_of_green_potions"] * 100 + inventory["green_ml_in_barrels"])
-    # blue_score = Option(BLUE, inventory["number_of_blue_potions"] * 100 + inventory["blue_ml_in_barrels"])
     red_score = Option(RED, randint(0, 100))
     green_score = Option(GREEN, randint(0, 100))
     blue_score = Option(BLUE, randint(0, 100))
-    print("red_score:", red_score)
-    print("green_score:", green_score)
-    print("blue_score:", blue_score)
 
+    scores = [red_score, green_score, blue_score]
     to_buy = defaultdict(lambda: 0)
 
     while gold_remaining > 0.15 * inventory["gold"]:
-        priority_option = min(red_score, green_score, blue_score)
-        print("priority_option:", priority_option)
-
-        if priority_option.color == RED:
-            best_red_barrel = get_best_barrel_sku_and_price(wholesale_red_barrels, gold_remaining)
-            if best_red_barrel:
-                to_buy[best_red_barrel.sku] += 1
-                gold_remaining -= best_red_barrel.price
-                print("Purchasing red barrel:", best_red_barrel.sku, "for", best_red_barrel.price, "gold.")
-                print("gold_remaining:", gold_remaining)
-                red_score.score += best_red_barrel.ml_per_barrel
-                print("red_score:", red_score)
-                wholesale_red_barrels[best_red_barrel.sku].quantity -= 1
-                if wholesale_red_barrels[best_red_barrel.sku].quantity == 0:
-                    wholesale_red_barrels.pop(best_red_barrel.sku)
-                if not wholesale_red_barrels:
-                    print("wholesale_red_barrels is empty")
-                    red_score.score = math.inf
-                continue
+        priority_option = min(scores, key=lambda x: x.score)
+        if priority_option.score == math.inf:
             break
+        gold_remaining, to_buy = purchase_barrels(priority_option, wholesale_barrels, gold_remaining, to_buy)
 
-        elif priority_option.color == GREEN:
-            best_green_barrel = get_best_barrel_sku_and_price(wholesale_green_barrels, gold_remaining)
-            if best_green_barrel:
-                to_buy[best_green_barrel.sku] += 1
-                gold_remaining -= best_green_barrel.price
-                print("Purchasing green barrel:", best_green_barrel.sku, "for", best_green_barrel.price, "gold.")
-                print("gold_remaining:", gold_remaining)
-                green_score.score += best_green_barrel.ml_per_barrel
-                print("green_score:", green_score)
-                wholesale_green_barrels[best_green_barrel.sku].quantity -= 1
-                if wholesale_green_barrels[best_green_barrel.sku].quantity == 0:
-                    wholesale_green_barrels.pop(best_green_barrel.sku)
-                if not wholesale_green_barrels:
-                    print("wholesale_green_barrels is empty")
-                    green_score.score = math.inf
-                continue
-            break
-
-        elif priority_option.color == BLUE:
-            best_blue_barrel = get_best_barrel_sku_and_price(wholesale_blue_barrels, gold_remaining)
-            if best_blue_barrel:
-                to_buy[best_blue_barrel.sku] += 1
-                gold_remaining -= best_blue_barrel.price
-                print("Purchasing blue barrel:", best_blue_barrel.sku, "for", best_blue_barrel.price, "gold.")
-                print("gold_remaining:", gold_remaining)
-                blue_score.score += best_blue_barrel.ml_per_barrel
-                print("blue_score:", blue_score)
-                wholesale_blue_barrels[best_blue_barrel.sku].quantity -= 1
-                if wholesale_blue_barrels[best_blue_barrel.sku].quantity == 0:
-                    wholesale_blue_barrels.pop(best_blue_barrel.sku)
-                if not wholesale_blue_barrels:
-                    print("wholesale_blue_barrels is empty")
-                    blue_score.score = math.inf
-                continue
-            break
-
-    print("to_buy:", to_buy)
-    # convert default dict into list of objects of format {"sku": string, "quantity": int}
     list_to_buy = [{"sku": sku, "quantity": quantity} for sku, quantity in to_buy.items()]
 
     print("list_to_buy:", list_to_buy)
     print("gold remaining after purchase is made:", gold_remaining)
+
+    prof_call = ProfessorCalls(
+        endpoint="barrels/wholesale",
+        arguments={
+            "wholesale_catalog": wholesale_catalog
+        },
+        response=str(list_to_buy)
+    )
+    db.add(prof_call)
+    db.commit()
+
     return list_to_buy
