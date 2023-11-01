@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 
 from src.api import auth
 from src.api.audit import get_inventory
-from src.database import get_db, PotionLedgerEntries, GlobalCatalog, GlobalInventory
+from src.database import get_db, PotionLedgerEntries, GlobalCatalog, GlobalInventory, ProfessorCalls
 
 router = APIRouter(
     prefix="/bottler",
@@ -26,6 +26,15 @@ async def post_deliver_bottles(potions_delivered: list[PotionInventory], db: Ses
     """Receive deliveries of new potions, update the inventory, global catalog, and ledgers."""
 
     # Set a seller ID based on your business logic. For this example, it's a fixed value.
+    prof_call = ProfessorCalls(
+        endpoint="bottler/deliver",
+        arguments= {
+            "potions_delivered": potions_delivered
+        }
+    )
+    db.add(prof_call)
+    db.flush()
+
     seller_id = "besttriplec"
 
     # Retrieve the seller's global inventory
@@ -81,10 +90,17 @@ async def post_deliver_bottles(potions_delivered: list[PotionInventory], db: Ses
 
 
 @router.post("/plan")
-async def get_bottle_plan():
+async def get_bottle_plan(db: Session = Depends(get_db)):
     """
     Create a potion mix with random components ensuring the total is always 100ml.
     """
+    prof_call = ProfessorCalls(
+        endpoint="bottler/plan",
+        arguments={}
+    )
+    db.add(prof_call)
+    db.commit()
+
     inventory = get_inventory()  # This function should retrieve the current inventory status
     print("Starting with inventory:", inventory)
 
@@ -96,14 +112,16 @@ async def get_bottle_plan():
 
     if total_inventory < 100:
         print("Not enough materials to make a 100ml potion.")
-        raise HTTPException(status_code=400, detail="Not enough inventory to create a 100ml potion.")
+        # raise HTTPException(status_code=400, detail="Not enough inventory to create a 100ml potion.")
+        return []
 
     available_components = [component for component in potion_components if inventory.get(component, 0) > 0]
     print("Available components:", available_components)
 
     if not available_components:
         print("No components available to create a potion.")
-        raise HTTPException(status_code=400, detail="No components available to create a potion.")
+        # raise HTTPException(status_code=400, detail="No components available to create a potion.")
+        return []
 
     num_potions = total_inventory // 100
     print(f"Planning to create {num_potions} potion(s)")

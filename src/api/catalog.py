@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
-from src.database import get_db, GlobalCatalog
+from src.database import get_db, GlobalCatalog, ProfessorCalls
 
 router = APIRouter()
 
@@ -14,6 +14,14 @@ QUANTITY = 5
 
 @router.get("/catalog/", tags=["catalog"])
 def get_catalog(db: Session = Depends(get_db)):
+
+    prof_call = ProfessorCalls(
+        endpoint="catalog",
+        arguments={}
+    )
+    db.add(prof_call)
+    db.commit()
+
     potions = db.query(GlobalCatalog).filter(GlobalCatalog.quantity > 0).all()
 
     payload = []

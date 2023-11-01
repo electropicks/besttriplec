@@ -6,10 +6,12 @@ from random import randint
 import sqlalchemy
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel
+from sqlalchemy.orm import Session
 
 from src import database as db
 from src.api import auth
 from src.api.audit import get_inventory
+from src.database import ProfessorCalls
 
 router = APIRouter(
     prefix="/barrels",
@@ -45,8 +47,18 @@ class Barrel(BaseModel):
 
 
 @router.post("/deliver")
-def post_deliver_barrels(barrels_delivered: list[Barrel]):
+def post_deliver_barrels(barrels_delivered: list[Barrel], db: Session = Depends(db.get_db)):
     """ """
+
+    prof_call = ProfessorCalls(
+        endpoint="barrels/deliver",
+        arguments= {
+            "barrels_delivered": barrels_delivered
+        }
+    )
+    db.add(prof_call)
+    db.commit()
+
     print("barrels_delivered", barrels_delivered)
 
     with db.engine.begin() as connection:

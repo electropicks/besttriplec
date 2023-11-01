@@ -7,7 +7,7 @@ from sqlalchemy import asc, desc
 from sqlalchemy.orm import Session
 
 from src.api import auth
-from src.database import GlobalCatalog, OrderHistory, GlobalInventory, GlobalCarts, get_db
+from src.database import GlobalCatalog, OrderHistory, GlobalInventory, GlobalCarts, get_db, ProfessorCalls
 
 router = APIRouter(
     prefix="/carts",
@@ -98,6 +98,14 @@ class NewCart(BaseModel):
 
 @router.post("/")
 def create_cart(new_cart: NewCart, db: Session = Depends(get_db)):
+    prof_call = ProfessorCalls(
+        endpoint="carts/",
+        arguments={
+            "new_cart": new_cart
+        }
+    )
+    db.add(prof_call)
+    db.flush()
     cart = GlobalCarts(customer_name=new_cart.customer, created_at=datetime.utcnow())
     db.add(cart)
     db.commit()
@@ -108,6 +116,14 @@ def create_cart(new_cart: NewCart, db: Session = Depends(get_db)):
 
 @router.get("/{cart_id}")
 def get_cart(cart_id: int, db: Session = Depends(get_db)):
+    prof_call = ProfessorCalls(
+        endpoint="carts/{cart_id}",
+        arguments={
+            "cart_id": cart_id
+        }
+    )
+    db.add(prof_call)
+    db.commit()
     cart = db.query(GlobalCarts).filter_by(cart_id=cart_id).first()
     if not cart:
         raise HTTPException(status_code=404, detail="Item not found")
@@ -121,6 +137,17 @@ class CartItem(BaseModel):
 @router.post("/{cart_id}/items/{item_sku}")
 def set_item_quantity(cart_id: int, item_sku: str, cart_item: CartItem, db: Session = Depends(get_db)):
     """ """
+    prof_call = ProfessorCalls(
+        endpoint="carts/{cart_id}/items/{item_sku}",
+        arguments={
+            "cart_id": cart_id,
+            "item_sku": item_sku,
+            "cart_item": cart_item
+        }
+    )
+    db.add(prof_call)
+    db.flush()
+
     cart_items = db.query(CartItem).filter_by(cart_id=cart_id, sku=item_sku).all()
     catalog_item = db.query(GlobalCatalog).filter_by(sku=item_sku).first()
 
@@ -156,6 +183,17 @@ class CartCheckout(BaseModel):
 
 @router.post("/{cart_id}/checkout")
 def checkout(cart_id: int, cart_checkout: CartCheckout, db: Session = Depends(get_db)):
+    """ """
+    prof_call = ProfessorCalls(
+        endpoint="carts/{cart_id}/checkout",
+        arguments={
+            "cart_id": cart_id,
+            "cart_checkout": cart_checkout
+        }
+    )
+    db.add(prof_call)
+    db.flush()
+
     cart = db.query(GlobalCarts).filter_by(id=cart_id).first()
     if not cart:
         raise HTTPException(status_code=404, detail="Cart not found")

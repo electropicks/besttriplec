@@ -40,8 +40,4 @@ OrderHistory = Base.classes.order_history
 InventoryLedgerEntries = Base.classes.inventory_ledger_entries
 GlobalCatalog = Base.classes.global_catalog
 PotionLedgerEntries = Base.classes.potion_ledger_entries
-
-InventoryLedgerEntries = Base.classes.inventory_ledger_entries
-GlobalCatalog = Base.classes.global_catalog
-PotionLedgerEntries = Base.classes.potion_ledger_entries
-
+ProfessorCalls = Base.classes.professor_calls
