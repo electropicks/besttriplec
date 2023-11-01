@@ -14,14 +14,6 @@ QUANTITY = 5
 
 @router.get("/catalog/", tags=["catalog"])
 def get_catalog(db: Session = Depends(get_db)):
-
-    prof_call = ProfessorCalls(
-        endpoint="catalog",
-        arguments={}
-    )
-    db.add(prof_call)
-    db.commit()
-
     potions = db.query(GlobalCatalog).filter(GlobalCatalog.quantity > 0).all()
 
     payload = []
@@ -45,5 +37,12 @@ def get_catalog(db: Session = Depends(get_db)):
                 "potion_type": [potion.red, potion.green, potion.blue, potion.dark],
             }
         )
+    prof_call = ProfessorCalls(
+        endpoint="catalog",
+        arguments={},
+        response=str(payload)
+    )
+    db.add(prof_call)
+    db.commit()
 
     return payload
