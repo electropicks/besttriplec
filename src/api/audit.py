@@ -1,11 +1,9 @@
 from enum import Enum
 
-import sqlalchemy
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
-from src import database as db
 from src.api import auth
 from src.database import ProfessorCalls, get_db, GlobalInventory, GlobalCatalog
 
@@ -21,6 +19,7 @@ class Column(Enum):
     ML = 1
 
 
+@router.get("/inventory")
 def get_inventory(db: Session = Depends(get_db)):
     # Logging the professor's call
     prof_call = ProfessorCalls(
@@ -59,6 +58,7 @@ def get_inventory(db: Session = Depends(get_db)):
     db.commit()
 
     return payload
+
 
 # Returning the modified function to get feedback before proceeding further
 
