@@ -92,48 +92,6 @@ def post_deliver_barrels(barrels_delivered: list[Barrel], db: Session = Depends(
             )
             db.execute(stmt)
 
-        # Loop through barrels delivered and update the global_inventory using ORM
-    for barrel in barrels_delivered:
-        if barrel.potion_type == [1, 0, 0, 0]:
-            stmt = (
-                update(GlobalInventory)
-                .values(
-                    red_ml=GlobalInventory.red_ml + barrel.ml_per_barrel * barrel.quantity,
-                    checking_gold=GlobalInventory.checking_gold - barrel.price * barrel.quantity
-                )
-            )
-            db.execute(stmt)
-
-        elif barrel.potion_type == [0, 1, 0, 0]:
-            stmt = (
-                update(GlobalInventory)
-                .values(
-                    green_ml=GlobalInventory.green_ml + barrel.ml_per_barrel * barrel.quantity,
-                    checking_gold=GlobalInventory.checking_gold - barrel.price * barrel.quantity
-                )
-            )
-            db.execute(stmt)
-
-        elif barrel.potion_type == [0, 0, 1, 0]:
-            stmt = (
-                update(GlobalInventory)
-                .values(
-                    blue_ml=GlobalInventory.blue_ml + barrel.ml_per_barrel * barrel.quantity,
-                    checking_gold=GlobalInventory.checking_gold - barrel.price * barrel.quantity
-                )
-            )
-            db.execute(stmt)
-
-        elif barrel.potion_type == [0, 0, 0, 1]:
-            stmt = (
-                update(GlobalInventory)
-                .values(
-                    dark_ml=GlobalInventory.dark_ml + barrel.ml_per_barrel * barrel.quantity,
-                    checking_gold=GlobalInventory.checking_gold - barrel.price * barrel.quantity
-                )
-            )
-            db.execute(stmt)
-
     # Logging the professor's call
     prof_call = ProfessorCalls(
         endpoint="barrels/deliver",
