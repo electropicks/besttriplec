@@ -21,13 +21,7 @@ class Column(Enum):
 
 @router.get("/inventory")
 def get_inventory(db: Session = Depends(get_db)):
-    # Logging the professor's call
-    prof_call = ProfessorCalls(
-        endpoint="audit/inventory",
-        arguments={}
-    )
-    db.add(prof_call)
-
+    """ """
     # Fetching gold from global_inventory using ORM
     num_gold = db.query(GlobalInventory.checking_gold).first()[0]
 
@@ -55,6 +49,13 @@ def get_inventory(db: Session = Depends(get_db)):
         "dark_ml_in_barrels": num_dark_ml,
         "gold": num_gold
     }
+    # Logging the professor's call
+    prof_call = ProfessorCalls(
+        endpoint="audit/inventory",
+        arguments={},
+        response=str(payload)
+    )
+    db.add(prof_call)
     db.commit()
 
     return payload
