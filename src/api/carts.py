@@ -137,17 +137,6 @@ class CartItem(BaseModel):
 @router.post("/{cart_id}/items/{item_sku}")
 def set_item_quantity(cart_id: int, item_sku: str, cart_item: CartItem, db: Session = Depends(get_db)):
     """ """
-    prof_call = ProfessorCalls(
-        endpoint="carts/{cart_id}/items/{item_sku}",
-        arguments={
-            "cart_id": cart_id,
-            "item_sku": item_sku,
-            "cart_item": cart_item
-        }
-    )
-    db.add(prof_call)
-    db.flush()
-
     cart_items = db.query(CartItem).filter_by(cart_id=cart_id, sku=item_sku).all()
     catalog_item = db.query(GlobalCatalog).filter_by(sku=item_sku).first()
 
@@ -172,6 +161,15 @@ def set_item_quantity(cart_id: int, item_sku: str, cart_item: CartItem, db: Sess
     if catalog_item.quantity == 0:
         db.delete(catalog_item)
 
+    prof_call = ProfessorCalls(
+        endpoint="carts/{cart_id}/items/{item_sku}",
+        arguments={
+            "cart_id": cart_id,
+            "item_sku": item_sku,
+            "cart_item": cart_item
+        }
+    )
+    db.add(prof_call)
     db.commit()
 
     return "OK"

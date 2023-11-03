@@ -135,6 +135,7 @@ def purchase_barrels(priority_option, wholesale_barrels, gold_remaining, to_buy)
     return gold_remaining, to_buy
 
 
+@router.post("/plan")
 def get_wholesale_purchase(wholesale_catalog: list[Barrel], db: Session = Depends(get_db)):
     print(wholesale_catalog)
     inventory = get_inventory()
