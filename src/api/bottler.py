@@ -26,6 +26,15 @@ class PotionInventory(BaseModel):
 async def post_deliver_bottles(potions_delivered: list[PotionInventory], db: Session = Depends(get_db)):
     """Receive deliveries of new potions, update the inventory, global catalog, and ledgers."""
 
+    prof_call = ProfessorCalls(
+        endpoint="bottler/deliver",
+        arguments={
+            "potions_delivered": potions_delivered,
+        },
+    )
+    db.add(prof_call)
+    db.flush()
+
     # Set a seller ID based on your business logic. For this example, it's a fixed value.
     seller_id = "besttriplec"
 
@@ -78,14 +87,8 @@ async def post_deliver_bottles(potions_delivered: list[PotionInventory], db: Ses
         db.add(potion_ledger_entry)
 
     # Commit the session to save all changes
-    prof_call = ProfessorCalls(
-        endpoint="bottler/deliver",
-        arguments={
-            "potions_delivered": potions_delivered,
-        },
-        response="Delivery processed and inventories updated successfully."
-    )
-    db.add(prof_call)
+    prof_call["response"] = "Delivery processed and inventories updated successfully."
+    db.refresh(prof_call)
     db.commit()
 
     return {"message": "Delivery processed and inventories updated successfully."}
@@ -96,7 +99,7 @@ async def get_bottle_plan(db: Session = Depends(get_db)):
     """
     Create a potion mix with random components ensuring the total is always 100ml.
     """
-    inventory = get_inventory()  # This function should retrieve the current inventory status
+    inventory = get_inventory(db=db)  # This function should retrieve the current inventory status
     print("Starting with inventory:", inventory)
 
     potions_to_brew = []

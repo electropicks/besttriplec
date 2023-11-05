@@ -149,7 +149,7 @@ def get_wholesale_purchase(wholesale_catalog: list[Barrel], db: Session = Depend
     db.add(prof_call)
     db.flush()
     print(wholesale_catalog)
-    inventory = get_inventory()
+    inventory = get_inventory(db=db)
     print("inventory:", inventory)
 
     # Map potion types to colors
