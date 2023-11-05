@@ -50,6 +50,15 @@ class Barrel(BaseModel):
 @router.post("/deliver")
 def post_deliver_barrels(barrels_delivered: list[Barrel], db: Session = Depends(db.get_db)):
     """ """
+    prof_call = ProfessorCalls(
+        endpoint="barrels/deliver",
+        arguments={
+            "barrels_delivered": barrels_delivered
+        },
+    )
+    db.add(prof_call)
+    db.flush()
+
     # Loop through barrels delivered and update the global_inventory using ORM
     for barrel in barrels_delivered:
         if barrel.potion_type == [1, 0, 0, 0]:
@@ -93,14 +102,8 @@ def post_deliver_barrels(barrels_delivered: list[Barrel], db: Session = Depends(
             db.execute(stmt)
 
     # Logging the professor's call
-    prof_call = ProfessorCalls(
-        endpoint="barrels/deliver",
-        arguments={
-            "barrels_delivered": barrels_delivered
-        },
-        response="OK"
-    )
-    db.add(prof_call)
+    prof_call["response"] = "OK"
+    db.refresh(prof_call)
     db.commit()
 
     return "OK"
@@ -137,6 +140,14 @@ def purchase_barrels(priority_option, wholesale_barrels, gold_remaining, to_buy)
 
 @router.post("/plan")
 def get_wholesale_purchase(wholesale_catalog: list[Barrel], db: Session = Depends(get_db)):
+    prof_call = ProfessorCalls(
+        endpoint="barrels/wholesale",
+        arguments={
+            "wholesale_catalog": wholesale_catalog
+        },
+    )
+    db.add(prof_call)
+    db.flush()
     print(wholesale_catalog)
     inventory = get_inventory()
     print("inventory:", inventory)
@@ -176,14 +187,8 @@ def get_wholesale_purchase(wholesale_catalog: list[Barrel], db: Session = Depend
     print("list_to_buy:", list_to_buy)
     print("gold remaining after purchase is made:", gold_remaining)
 
-    prof_call = ProfessorCalls(
-        endpoint="barrels/wholesale",
-        arguments={
-            "wholesale_catalog": wholesale_catalog
-        },
-        response=str(list_to_buy)
-    )
-    db.add(prof_call)
+    prof_call["response"] = str(list_to_buy)
+    db.refresh(prof_call)
     db.commit()
 
     return list_to_buy
