@@ -143,7 +143,7 @@ def get_wholesale_purchase(wholesale_catalog: list[Barrel], db: Session = Depend
     prof_call = ProfessorCalls(
         endpoint="barrels/wholesale",
         arguments={
-            "wholesale_catalog": wholesale_catalog
+            "wholesale_catalog": [barrel.dict() for barrel in wholesale_catalog]
         },
     )
     db.add(prof_call)
